@@ -31,7 +31,9 @@ app.use(cors({
     if (!origin) return callback(null, true);
     
     const isLocalhost = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
-    if (isLocalhost || allowedOrigins.includes(origin)) {
+    const isVercel = origin.endsWith('.vercel.app');
+    
+    if (isLocalhost || isVercel || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     
