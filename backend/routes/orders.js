@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+const { rewardReferrerIfEligible } = require('../utils/referralReward');
 
 // Create order
 router.post('/', authMiddleware, async (req, res) => {
@@ -24,11 +25,42 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    let paymentStatus = 'pending';
+    let orderStatus = 'pending';
+
+    // Handle instant payment via wallet
+    if (paymentMethod === 'wallet') {
+      const walletRes = await pool.query(
+        'SELECT id, balance FROM public.wallet WHERE user_id = $1',
+        [req.user.userId]
+      );
+
+      if (walletRes.rows.length === 0) {
+        return res.status(404).json({ error: 'Wallet not found' });
+      }
+
+      const wallet = walletRes.rows[0];
+      const parsedTotal = parseFloat(totalPrice);
+
+      if (parseFloat(wallet.balance) < parsedTotal) {
+        return res.status(400).json({ error: 'Insufficient wallet balance' });
+      }
+
+      // Deduct balance
+      await pool.query(
+        'UPDATE public.wallet SET balance = balance - $1 WHERE id = $2',
+        [parsedTotal, wallet.id]
+      );
+
+      paymentStatus = 'completed';
+      orderStatus = 'confirmed';
+    }
+
     const result = await pool.query(
       `INSERT INTO public.orders 
        (user_id, subscription_id, thali_id, quantity, delivery_date, delivery_time, 
-        delivery_address, delivery_latitude, delivery_longitude, total_price, payment_method, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        delivery_address, delivery_latitude, delivery_longitude, total_price, payment_method, payment_status, order_status, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         req.user.userId,
@@ -42,48 +74,27 @@ router.post('/', authMiddleware, async (req, res) => {
         deliveryLongitude,
         totalPrice,
         paymentMethod || 'razorpay',
+        paymentStatus,
+        orderStatus,
         notes,
       ]
     );
 
     const order = result.rows[0];
 
-    // Referral Commission Logic
-    try {
-      const referral = await pool.query(
-        'SELECT referrer_id FROM public.referrals WHERE referred_user_id = $1 LIMIT 1',
+    // Log wallet transaction if paid via wallet
+    if (paymentMethod === 'wallet') {
+      const walletRes = await pool.query(
+        'SELECT id FROM public.wallet WHERE user_id = $1',
         [req.user.userId]
       );
-
-      if (referral.rows.length > 0) {
-        const referrerId = referral.rows[0].referrer_id;
-        const commissionAmount = parseFloat(totalPrice) * 0.05; // 5% commission
-
-        // Update referrer's wallet
-        const wallet = await pool.query(
-          'SELECT id FROM public.wallet WHERE user_id = $1',
-          [referrerId]
+      if (walletRes.rows.length > 0) {
+        await pool.query(
+          `INSERT INTO public.wallet_transactions (wallet_id, transaction_type, amount, description, order_id)
+           VALUES ($1, 'debit', $2, $3, $4)`,
+          [walletRes.rows[0].id, totalPrice, `Order payment for order #${order.id.slice(0, 8)}`, order.id]
         );
-
-        if (wallet.rows.length > 0) {
-          await pool.query(
-            `UPDATE public.wallet 
-             SET balance = balance + $1, total_earned = total_earned + $1
-             WHERE id = $2`,
-            [commissionAmount, wallet.rows[0].id]
-          );
-
-          // Create transaction
-          await pool.query(
-            `INSERT INTO public.wallet_transactions (wallet_id, transaction_type, amount, description)
-             VALUES ($1, 'referral_commission', $2, $3)`,
-            [wallet.rows[0].id, commissionAmount, `Referral commission from order #${order.id.slice(0,8)}`]
-          );
-        }
       }
-    } catch (referralErr) {
-      console.error('Referral commission processing error:', referralErr);
-      // Don't fail the order if referral processing fails
     }
 
     res.status(201).json(order);
@@ -171,7 +182,18 @@ router.put('/:id/status', authMiddleware, async (req, res) => {
       [orderStatus, req.params.id]
     );
 
-    res.json(result.rows[0]);
+    const updatedOrder = result.rows[0];
+
+    // If order status is set to delivered, trigger referral rewards
+    if (orderStatus === 'delivered') {
+      try {
+        await rewardReferrerIfEligible(updatedOrder.user_id, updatedOrder.id);
+      } catch (err) {
+        console.error('Failed to reward referrer on order status update:', err);
+      }
+    }
+
+    res.json(updatedOrder);
   } catch (error) {
     console.error('Update order status error:', error);
     res.status(500).json({ error: 'Failed to update order' });

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+const { rewardReferrerIfEligible } = require('../utils/referralReward');
 
 // Get assigned orders for delivery boy
 router.get('/orders', authMiddleware, roleMiddleware(['delivery_boy']), async (req, res) => {
@@ -68,12 +69,20 @@ router.post('/tracking/:orderId', authMiddleware, roleMiddleware(['delivery_boy'
 
     // Update order status based on delivery tracking status
     if (status === 'delivered') {
-      await pool.query(
+      const orderRes = await pool.query(
         `UPDATE public.orders 
          SET order_status = 'delivered', delivery_time_actual = CURRENT_TIMESTAMP
-         WHERE id = $1`,
+         WHERE id = $1
+         RETURNING user_id`,
         [req.params.orderId]
       );
+      if (orderRes.rows.length > 0) {
+        try {
+          await rewardReferrerIfEligible(orderRes.rows[0].user_id, req.params.orderId);
+        } catch (err) {
+          console.error('Failed to reward referrer on delivery tracking status update:', err);
+        }
+      }
     } else if (status === 'on_the_way') {
       await pool.query(
         `UPDATE public.orders 

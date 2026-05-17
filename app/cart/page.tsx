@@ -1,16 +1,131 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Trash2, ShoppingBag } from 'lucide-react'
+import { ArrowLeft, Trash2, ShoppingBag, Sparkles, CheckCircle2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useCart } from '@/context/cart-context'
+import { API_BASE_URL } from '@/lib/api'
 import { toast } from 'sonner'
 
 export default function CartPage() {
   const { items, total, removeItem, updateQuantity } = useCart()
+  const [couponCode, setCouponCode] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string
+    discountAmount: number
+    discountPercent?: number
+  } | null>(null)
+  const [applying, setApplying] = useState(false)
+
+  // Load existing coupon if any
+  useEffect(() => {
+    const saved = localStorage.getItem('nutriNestAppliedCoupon')
+    if (saved) {
+      try {
+        setAppliedCoupon(JSON.parse(saved))
+      } catch (e) {
+        console.error(e)
+      }
+    }
+  }, [])
+
+  // Re-calculate coupon discount if cart total changes
+  useEffect(() => {
+    if (appliedCoupon && items.length > 0) {
+      // Validate coupon again dynamically or adjust discount amount
+      const code = appliedCoupon.code;
+      
+      const checkAndAdjustCoupon = async () => {
+        try {
+          const token = localStorage.getItem('nutriNestToken');
+          const response = await fetch(`${API_BASE_URL}/api/coupons/apply`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ code, cartTotal: total })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const updatedCoupon = {
+              code: data.code,
+              discountAmount: data.discountAmount,
+              discountPercent: data.discountValue
+            };
+            setAppliedCoupon(updatedCoupon);
+            localStorage.setItem('nutriNestAppliedCoupon', JSON.stringify(updatedCoupon));
+          } else {
+            // Remove coupon if cart total no longer qualifies
+            setAppliedCoupon(null);
+            localStorage.removeItem('nutriNestAppliedCoupon');
+            toast.info('Applied promo code removed because basket total doesn\'t meet the criteria anymore.');
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      };
+
+      checkAndAdjustCoupon();
+    }
+  }, [total, items.length])
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast.error('Please enter a coupon code');
+      return;
+    }
+
+    setApplying(true);
+    try {
+      const token = localStorage.getItem('nutriNestToken');
+      const response = await fetch(`${API_BASE_URL}/api/coupons/apply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          code: couponCode.trim(),
+          cartTotal: total
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        const newCoupon = {
+          code: data.code,
+          discountAmount: data.discountAmount,
+          discountPercent: data.discountValue
+        };
+        setAppliedCoupon(newCoupon);
+        localStorage.setItem('nutriNestAppliedCoupon', JSON.stringify(newCoupon));
+        toast.success(`Coupon "${data.code}" applied! You saved ₹${data.discountAmount}`);
+        setCouponCode('');
+      } else {
+        toast.error(data.error || 'Failed to apply coupon');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to apply coupon. Please try again.');
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    localStorage.removeItem('nutriNestAppliedCoupon');
+    toast.success('Promo code removed');
+  };
+
+  const discountedTotal = appliedCoupon ? Math.max(0, total - appliedCoupon.discountAmount) : total;
 
   if (items.length === 0) {
     return (
@@ -36,7 +151,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] pb-40">
+    <div className="min-h-screen bg-[#F8F9FA] pb-48 sm:pb-52">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-xl sticky top-0 z-50 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-4">
@@ -53,7 +168,7 @@ export default function CartPage() {
       </header>
 
       {/* Content */}
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         <div className="space-y-4">
           {items.map((item) => (
             <motion.div
@@ -118,6 +233,65 @@ export default function CartPage() {
             </motion.div>
           ))}
         </div>
+
+        {/* Promo / Coupon Box */}
+        <Card className="p-6 rounded-[2rem] border-none shadow-sm bg-white space-y-4">
+          <div>
+            <h4 className="font-black text-sm text-foreground flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" />
+              Apply Promo Code
+            </h4>
+            <p className="text-xs text-muted-foreground mt-0.5">Use "10OFF" on cart orders above ₹500 for a 10% discount!</p>
+          </div>
+
+          <AnimatePresence mode="wait">
+            {appliedCoupon ? (
+              <motion.div
+                key="applied"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="flex items-center justify-between p-4 bg-green-50 rounded-2xl border border-green-100"
+              >
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  <div>
+                    <p className="font-black text-green-800 text-sm">Coupon: {appliedCoupon.code}</p>
+                    <p className="text-xs text-green-600 font-bold">Discount Applied: -₹{appliedCoupon.discountAmount.toFixed(2)} ({appliedCoupon.discountPercent}%)</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={handleRemoveCoupon}
+                  className="w-8 h-8 rounded-xl hover:bg-green-100 flex items-center justify-center text-green-700 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="input"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex gap-3"
+              >
+                <Input
+                  placeholder="Enter code (e.g. 10OFF)"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  className="h-12 bg-gray-50 border-none rounded-xl font-bold uppercase"
+                />
+                <Button 
+                  onClick={handleApplyCoupon}
+                  disabled={applying}
+                  className="rounded-xl h-12 px-6 font-black uppercase tracking-wider text-xs shadow-md bg-primary text-white"
+                >
+                  Apply
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </Card>
       </main>
 
       {/* Modern Checkout Bar */}
@@ -129,7 +303,12 @@ export default function CartPage() {
             <div className="flex justify-between items-center px-2">
               <div className="space-y-1">
                 <p className="text-[10px] text-white/50 font-black uppercase tracking-[0.2em]">Basket Total</p>
-                <p className="text-4xl font-black text-primary tracking-tighter">₹{total.toFixed(2)}</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-4xl font-black text-primary tracking-tighter">₹{discountedTotal.toFixed(0)}</p>
+                  {appliedCoupon && (
+                    <span className="text-xs text-white/50 line-through">₹{total.toFixed(0)}</span>
+                  )}
+                </div>
               </div>
               <div className="text-right">
                 <p className="text-xs font-bold text-green-400">FREE DELIVERY</p>
@@ -149,3 +328,4 @@ export default function CartPage() {
     </div>
   )
 }
+

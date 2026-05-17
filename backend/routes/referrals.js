@@ -70,7 +70,7 @@ router.post('/apply-code', authMiddleware, async (req, res) => {
 
     const referrerId = referrer.rows[0].referrer_id;
 
-    // Update referral record
+    // Update referral record (linking referred_user_id, but do not award wallet bonus yet)
     const updateResult = await pool.query(
       `UPDATE public.referrals 
        SET referred_user_id = $1, is_claimed = true, claimed_at = CURRENT_TIMESTAMP
@@ -79,33 +79,8 @@ router.post('/apply-code', authMiddleware, async (req, res) => {
       [req.user.userId, referralCode]
     );
 
-    // Add bonus to referrer's wallet
-    const bonusAmount = 100; // ₹100 bonus
-
-    const wallet = await pool.query(
-      'SELECT id FROM public.wallet WHERE user_id = $1',
-      [referrerId]
-    );
-
-    if (wallet.rows.length > 0) {
-      await pool.query(
-        `UPDATE public.wallet 
-         SET balance = balance + $1, total_earned = total_earned + $1
-         WHERE id = $2`,
-        [bonusAmount, wallet.rows[0].id]
-      );
-
-      // Create transaction
-      await pool.query(
-        `INSERT INTO public.wallet_transactions (wallet_id, transaction_type, amount, description)
-         VALUES ($1, 'referral_bonus', $2, 'Referral bonus for inviting a new user')`,
-        [wallet.rows[0].id, bonusAmount]
-      );
-    }
-
     res.json({
-      message: 'Referral code applied successfully',
-      bonusAwarded: bonusAmount
+      message: 'Referral code applied successfully. Reward will be added to referrer after your first order is completed.',
     });
   } catch (error) {
     console.error('Apply referral code error:', error);

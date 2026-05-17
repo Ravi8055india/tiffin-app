@@ -43,12 +43,6 @@ router.post('/register', async (req, res) => {
              VALUES ($1, $2, $3, true, CURRENT_TIMESTAMP)`,
             [referrer.rows[0].referrer_id, user.id, referralCode]
           );
-          
-          // Optional: Give signup bonus to new user
-          await pool.query(
-            'UPDATE public.wallet SET balance = balance + 50 WHERE user_id = $1',
-            [user.id]
-          );
         }
       } catch (refErr) {
         console.error('Referral processing error during signup:', refErr);

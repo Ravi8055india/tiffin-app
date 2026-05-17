@@ -157,11 +157,8 @@ export default function Home() {
               <Flame className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </motion.div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tight leading-none mb-1">NutriNest</h1>
-              <div className="flex items-center gap-1 text-[10px] sm:text-xs text-primary font-bold uppercase tracking-wider">
-                <MapPin className="w-3 h-3" />
-                <span>Sector 62, Noida</span>
-              </div>
+              <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tight leading-none">NutriNest</h1>
+              <p className="text-[10px] text-primary font-black uppercase tracking-[0.2em] mt-1">Premium Meals</p>
             </div>
           </div>
           

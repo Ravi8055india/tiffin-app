@@ -205,4 +205,89 @@ router.get('/thalis-analytics', authMiddleware, roleMiddleware(['admin']), async
   }
 });
 
+// Get all coupons (admin only)
+router.get('/coupons', authMiddleware, roleMiddleware(['admin']), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM public.coupons ORDER BY created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get coupons error:', error);
+    res.status(500).json({ error: 'Failed to get coupons' });
+  }
+});
+
+// Create coupon (admin only)
+router.post('/coupons', authMiddleware, roleMiddleware(['admin']), async (req, res) => {
+  try {
+    const { code, discountType, discountValue, minCartAmount, expiresAt } = req.body;
+
+    if (!code || !discountValue) {
+      return res.status(400).json({ error: 'Code and discount value required' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO public.coupons (code, discount_type, discount_value, min_cart_amount, expires_at)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [code.toUpperCase(), discountType || 'percentage', discountValue, minCartAmount || 0, expiresAt || null]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Create coupon error:', error);
+    if (error.code === '23505') {
+      return res.status(400).json({ error: 'Coupon code already exists' });
+    }
+    res.status(500).json({ error: 'Failed to create coupon' });
+  }
+});
+
+// Update coupon (admin only)
+router.put('/coupons/:id', authMiddleware, roleMiddleware(['admin']), async (req, res) => {
+  try {
+    const { discountValue, minCartAmount, isActive, expiresAt } = req.body;
+
+    const result = await pool.query(
+      `UPDATE public.coupons
+       SET discount_value = COALESCE($1, discount_value),
+           min_cart_amount = COALESCE($2, min_cart_amount),
+           is_active = COALESCE($3, is_active),
+           expires_at = COALESCE($4, expires_at)
+       WHERE id = $5
+       RETURNING *`,
+      [discountValue, minCartAmount, isActive, expiresAt || null, req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Coupon not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Update coupon error:', error);
+    res.status(500).json({ error: 'Failed to update coupon' });
+  }
+});
+
+// Delete coupon (admin only)
+router.delete('/coupons/:id', authMiddleware, roleMiddleware(['admin']), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM public.coupons WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Coupon not found' });
+    }
+
+    res.json({ message: 'Coupon deleted successfully', coupon: result.rows[0] });
+  } catch (error) {
+    console.error('Delete coupon error:', error);
+    res.status(500).json({ error: 'Failed to delete coupon' });
+  }
+});
+
 module.exports = router;

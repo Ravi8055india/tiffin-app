@@ -3,6 +3,37 @@ const router = express.Router();
 const pool = require('../config/database');
 const { authMiddleware } = require('../middleware/auth');
 
+// Get subscription plans with tiered discounts
+router.get('/plans', (req, res) => {
+  const plans = [
+    {
+      id: 'weekly',
+      name: 'Weekly Plan',
+      description: 'Perfect for testing our fresh daily kitchen meals',
+      durationDays: 7,
+      discountPercent: 10,
+      badge: '10% OFF'
+    },
+    {
+      id: 'monthly',
+      name: 'Monthly Plan',
+      description: 'Most popular plan for balanced, stress-free daily meals',
+      durationDays: 30,
+      discountPercent: 15,
+      badge: '15% OFF'
+    },
+    {
+      id: 'three_months',
+      name: '3-Month Plan',
+      description: 'Unbeatable value for long-term health and nutrition commitments',
+      durationDays: 90,
+      discountPercent: 20,
+      badge: '20% OFF'
+    }
+  ];
+  res.json(plans);
+});
+
 // Create subscription
 router.post('/', authMiddleware, async (req, res) => {
   try {
