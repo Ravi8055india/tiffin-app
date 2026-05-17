@@ -6,7 +6,7 @@
 - Created 12 PostgreSQL tables with proper relationships
 - Implemented Row Level Security (RLS) policies
 - Added database triggers for auto-creating profiles and wallets
-- Set up indexes for optimal query performance
+- Set up indexes for optimal query performance ss
 
 **Tables Created:**
 - users, thalis, subscriptions, orders, payments, wallet, wallet_transactions, referrals, delivery_tracking, admin_metrics
