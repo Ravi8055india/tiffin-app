@@ -54,10 +54,60 @@ export default function CheckoutPage() {
           setPincode(data.pincode || '')
         }
       } catch (error) {
-        console.error('Failed to fetch user address:', th
+        console.error('Failed to fetch user address:', error)
+      }
     }
-    }
+    fetchUserAddress()
+  }, [])
 
+  const handleCheckout = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    try {
+      const token = localStorage.getItem('nutriNestToken')
+      if (!token) {
+        router.push('/auth/login')
+        return
+      }
+
+      const orderData = {
+        items: items.map(i => ({ thali_id: i.thaliId, quantity: i.quantity, price: i.price })),
+        delivery_address: deliveryAddress,
+        city,
+        pincode,
+        delivery_date: deliveryDate,
+        delivery_time: deliveryTime,
+        payment_method: paymentMethod,
+        coupon_code: appliedCoupon?.code,
+        total_amount: appliedCoupon ? Math.max(0, total - appliedCoupon.discountAmount) : total
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(orderData)
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || 'Failed to place order')
+      }
+
+      toast.success('Order placed successfully!')
+      clearCart()
+      router.push('/orders')
+
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong')
+    } finally {
+      setLoading(false)
+    }
+  }
     return (
       <div className="min-h-screen bg-background pb-24">
         {/* Header */}
