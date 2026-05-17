@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useCart } from '@/context/cart-context'
+import { toast } from 'sonner'
 
 export default function CartPage() {
   const { items, total, removeItem, updateQuantity } = useCart()
@@ -14,7 +15,7 @@ export default function CartPage() {
   if (items.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex flex-col items-center justify-center p-6 text-center">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           className="space-y-6"
@@ -70,14 +71,14 @@ export default function CartPage() {
                       <div className="w-full h-full flex items-center justify-center text-4xl">🍲</div>
                     )}
                   </div>
-                  
+
                   {/* Details */}
                   <div className="flex-1 flex flex-col justify-between py-1">
                     <div>
                       <h3 className="font-black text-foreground text-lg tracking-tight mb-1">{item.thaliName}</h3>
                       <p className="text-primary font-black text-lg">₹{item.price}</p>
                     </div>
-                    
+
                     {/* Quantity Control */}
                     <div className="flex items-center gap-4">
                       <div className="flex items-center bg-gray-50 rounded-2xl p-1 border border-gray-100">
@@ -99,7 +100,7 @@ export default function CartPage() {
                           +
                         </Button>
                       </div>
-                      
+
                       <button
                         onClick={() => {
                           removeItem(item.thaliId);
@@ -123,7 +124,7 @@ export default function CartPage() {
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-lg z-50">
         <Card className="bg-foreground text-white p-6 rounded-[2.5rem] shadow-2xl border-none overflow-hidden relative">
           <div className="absolute top-[-50%] left-[-20%] w-[80%] h-[150%] bg-primary/10 rounded-full blur-[100px]" />
-          
+
           <div className="relative z-10 flex flex-col gap-6">
             <div className="flex justify-between items-center px-2">
               <div className="space-y-1">
@@ -135,7 +136,7 @@ export default function CartPage() {
                 <p className="text-[10px] text-white/30 uppercase font-bold">Applied automatically</p>
               </div>
             </div>
-            
+
             <Link href="/checkout">
               <Button className="w-full h-16 rounded-[1.5rem] bg-white text-foreground hover:bg-gray-100 text-lg font-black shadow-xl transition-transform active:scale-95 group">
                 Checkout Now

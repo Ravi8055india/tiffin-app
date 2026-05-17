@@ -80,8 +80,6 @@ PostgREST              # Auto-generated APIs
 
 ```
 nutriNest/
-├── 📄 SETUP.md                    # Detailed setup instructions
-├── 📄 IMPLEMENTATION_GUIDE.md     # Feature implementation guide
 ├── 📄 README.md                   # This file
 │
 ├── 🎨 app/                        # Next.js App Router
@@ -361,4 +359,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 **Built with ❤️ for delivering fresh meals to your doorstep!**
 
-**Questions?** Check SETUP.md and IMPLEMENTATION_GUIDE.md for detailed guides.
+**Questions?** Check this README.md for setup and installation instructions.

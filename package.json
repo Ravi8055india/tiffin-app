@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:backend": "node backend/server.js",
+    "dev:all": "concurrently \"next dev\" \"node backend/server.js\"",
     "build": "next build",
     "start": "next start",
     "start:backend": "NODE_ENV=production node backend/server.js",
@@ -77,6 +78,7 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^8.2.2",
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
     "tw-animate-css": "1.3.3",
